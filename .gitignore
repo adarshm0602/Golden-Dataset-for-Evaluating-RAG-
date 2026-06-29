@@ -59,6 +59,8 @@ data/raw_transcripts/*
 !data/raw_transcripts/.gitkeep
 data/cleaned-transcripts/*
 !data/cleaned-transcripts/.gitkeep
+data/cleaned_transcripts/*
+!data/cleaned_transcripts/.gitkeep
 data/summaries/*
 !data/summaries/.gitkeep
 data/datasets/*
