@@ -55,6 +55,8 @@ htmlcov/
 # Data artifacts (keep structure, ignore large/generated files)
 data/raw-transcripts/*
 !data/raw-transcripts/.gitkeep
+data/raw_transcripts/*
+!data/raw_transcripts/.gitkeep
 data/cleaned-transcripts/*
 !data/cleaned-transcripts/.gitkeep
 data/summaries/*

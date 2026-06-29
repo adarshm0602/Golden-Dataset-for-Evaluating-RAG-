@@ -1,5 +1,30 @@
 {
   "schema_version": "1.0",
   "description": "Source video registry for the golden RAG evaluation dataset pipeline.",
-  "videos": []
+  "videos": [
+    {
+      "title": "But what is a Neural Network?",
+      "channel": "3Blue1Brown",
+      "url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "languages": ["en"]
+    },
+    {
+      "title": "Transformers, the tech behind LLMs",
+      "channel": "3Blue1Brown",
+      "url": "https://www.youtube.com/watch?v=wjZofJX0v4M",
+      "languages": ["en"]
+    },
+    {
+      "title": "What is Deep Learning?",
+      "channel": "CampusX",
+      "url": "https://www.youtube.com/watch?v=fHF22Wxuyw4",
+      "languages": ["hi", "en"]
+    },
+    {
+      "title": "All About ML & Deep Learning",
+      "channel": "CodeWithHarry",
+      "url": "https://www.youtube.com/watch?v=C6YtPJxNULA",
+      "languages": ["hi", "en"]
+    }
+  ]
 }
