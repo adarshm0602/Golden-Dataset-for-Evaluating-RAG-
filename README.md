@@ -35,11 +35,14 @@ The corpus spans English and Hindi instructional content from 3Blue1Brown, Campu
 │   ├── clean_transcripts.py              # Normalize and segment into paragraphs
 │   ├── summarize.py                      # Generate structured summaries
 │   ├── generate_candidate_questions.py   # Produce ~20 candidate QA pairs
-│   └── select_golden_questions.py        # Select the best 5 for the golden set
+│   ├── select_golden_questions.py        # Select the best 5 for the golden set
+│   └── run_retrieval_benchmark.py        # Benchmark retrieval Hit@K and MRR
 ├── notebooks/                  # Exploratory analysis (optional)
 ├── reports/
 │   ├── methodology.md          # Full pipeline documentation
-│   └── future_work.md          # RAG integration and evaluation guide
+│   ├── future_work.md          # RAG integration and evaluation guide
+│   ├── benchmark_results.md    # Retrieval benchmark summary (generated)
+│   └── benchmark_results.json  # Machine-readable benchmark output
 ├── videos.json                 # Source video registry
 ├── candidate_questions.csv     # 20 candidate QA pairs
 ├── golden_dataset.csv          # 5 curated golden QA pairs
@@ -60,7 +63,7 @@ The corpus spans English and Hindi instructional content from 3Blue1Brown, Campu
 ### Setup
 
 ```bash
-git clone https://github.com/<your-org>/Golden-Dataset-for-Evaluating-RAG-.git
+git clone https://github.com/adarshm0602/Golden-Dataset-for-Evaluating-RAG-.git
 cd Golden-Dataset-for-Evaluating-RAG-
 
 python3 -m venv .venv
@@ -142,6 +145,16 @@ python3 scripts/select_golden_questions.py
 
 Evaluates all candidates against quality and diversity criteria, selects the best five, and writes `golden_dataset.csv`.
 
+### 6. Run retrieval benchmark
+
+```bash
+python3 scripts/run_retrieval_benchmark.py
+```
+
+Indexes paragraph chunks from `data/cleaned_transcripts/`, embeds them with a multilingual sentence-transformer, and scores retrieval against both `candidate_questions.csv` (20 rows) and `golden_dataset.csv` (5 rows). Ground truth: a hit is correct when the retrieved chunk's video title matches and the cited timestamp falls within the chunk's `[start, end]` range.
+
+Writes results to `reports/benchmark_results.json` and `reports/benchmark_results.md`.
+
 ---
 
 ## Workflow
@@ -163,6 +176,9 @@ generate_candidate_questions.py  ──►  candidate_questions.csv  (20 pairs)
     │
     ▼
 select_golden_questions.py     ──►  golden_dataset.csv       (5 pairs)
+    │
+    ▼
+run_retrieval_benchmark.py ──►  reports/benchmark_results.*
     │
     ▼
 reports/                   ──►  methodology, evaluation guides
@@ -210,6 +226,29 @@ Five questions selected for maximum evaluation value:
 | What is Deep Learning? | Deep Learning success factors | Hard |
 
 The golden set includes all candidate columns plus `Selection Rationale` explaining why each question was chosen.
+
+---
+
+## Benchmark Results
+
+Retrieval benchmark run on **123 paragraph chunks** from four cleaned transcripts, using `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. Reproduce with `python3 scripts/run_retrieval_benchmark.py`.
+
+### Overall
+
+| Dataset | Questions | Hit@1 | Hit@3 | Hit@5 | MRR |
+|---------|-----------|-------|-------|-------|-----|
+| Candidate questions | 20 | 15.0% | 15.0% | 30.0% | 0.185 |
+| Golden dataset | 5 | 20.0% | 20.0% | 40.0% | 0.250 |
+
+### Candidate set — by query type
+
+| Query type | Count | Hit@1 | Hit@3 | Hit@5 | MRR |
+|------------|-------|-------|-------|-------|-----|
+| Factual (Easy) | 5 | 20.0% | 20.0% | 20.0% | 0.200 |
+| Medium | 9 | 11.1% | 11.1% | 11.1% | 0.111 |
+| Multi-hop/synthesis (Hard) | 6 | 16.7% | 16.7% | 66.7% | 0.283 |
+
+Full per-question breakdown: [`reports/benchmark_results.md`](reports/benchmark_results.md).
 
 ---
 
@@ -292,6 +331,7 @@ the classic example of handwritten digit recognition...
 | Data validation | [Pydantic](https://docs.pydantic.dev/) v2 |
 | Data handling | [pandas](https://pandas.pydata.org/), [pyarrow](https://arrow.apache.org/docs/python/) |
 | Token counting | [tiktoken](https://github.com/openai/tiktoken) |
+| Retrieval embeddings | [sentence-transformers](https://www.sbert.net/) (`paraphrase-multilingual-MiniLM-L12-v2`) |
 | Configuration | [python-dotenv](https://github.com/theskumar/python-dotenv) |
 | Notebooks | Jupyter, ipykernel |
 | Development | pytest, ruff |

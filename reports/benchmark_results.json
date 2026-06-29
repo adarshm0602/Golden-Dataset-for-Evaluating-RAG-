@@ -1,0 +1,407 @@
+{
+  "generated_at": "2026-06-29T13:46:45.257051+00:00",
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "chunk_count": 123,
+  "datasets": {
+    "candidate_questions": {
+      "overall": {
+        "count": 20,
+        "mrr": 0.185,
+        "hit@1": 0.15,
+        "hit@3": 0.15,
+        "hit@5": 0.3
+      },
+      "by_difficulty": {
+        "Easy": {
+          "count": 5,
+          "mrr": 0.2,
+          "hit@1": 0.2,
+          "hit@3": 0.2,
+          "hit@5": 0.2
+        },
+        "Hard": {
+          "count": 6,
+          "mrr": 0.2833,
+          "hit@1": 0.1667,
+          "hit@3": 0.1667,
+          "hit@5": 0.6667
+        },
+        "Medium": {
+          "count": 9,
+          "mrr": 0.1111,
+          "hit@1": 0.1111,
+          "hit@3": 0.1111,
+          "hit@5": 0.1111
+        }
+      },
+      "by_query_type": {
+        "factual": {
+          "count": 5,
+          "mrr": 0.2,
+          "hit@1": 0.2,
+          "hit@3": 0.2,
+          "hit@5": 0.2
+        },
+        "medium": {
+          "count": 9,
+          "mrr": 0.1111,
+          "hit@1": 0.1111,
+          "hit@3": 0.1111,
+          "hit@5": 0.1111
+        },
+        "multi-hop/synthesis": {
+          "count": 6,
+          "mrr": 0.2833,
+          "hit@1": 0.1667,
+          "hit@3": 0.1667,
+          "hit@5": 0.6667
+        }
+      },
+      "per_question": [
+        {
+          "question": "According to the video, who will replace developers in the job market — AI or someone else?",
+          "video": "All About ML & Deep Learning",
+          "timestamp_seconds": 0.0,
+          "difficulty": "Easy",
+          "query_type": "factual",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "मशीन लर्निंग की परिभाषा क्या है और इसका एक उदाहरण दीजिए?",
+          "video": "All About ML & Deep Learning",
+          "timestamp_seconds": 65.0,
+          "difficulty": "Easy",
+          "query_type": "factual",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Reinforcement Learning में agent किस आधार पर सीखता है और उसका लक्ष्य क्या होता है?",
+          "video": "All About ML & Deep Learning",
+          "timestamp_seconds": 490.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "ML मॉडल ट्रेनिंग की step-by-step प्रोसेस क्या है?",
+          "video": "All About ML & Deep Learning",
+          "timestamp_seconds": 550.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Transformers ने LSTM की किस limitation को overcome किया?",
+          "video": "All About ML & Deep Learning",
+          "timestamp_seconds": 741.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": 5,
+          "reciprocal_rank": 0.2,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": true
+        },
+        {
+          "question": "In the 3Blue1Brown neural network video, what does a neuron hold and what is that value called?",
+          "video": "But what is a Neural Network?",
+          "timestamp_seconds": 172.0,
+          "difficulty": "Easy",
+          "query_type": "factual",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "How many total weights and biases does the neural network described in the 3Blue1Brown video have, and how is this number derived?",
+          "video": "But what is a Neural Network?",
+          "timestamp_seconds": 712.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit@1": true,
+          "hit@3": true,
+          "hit@5": true
+        },
+        {
+          "question": "What is the role of the bias in a neural network, according to the 3Blue1Brown video?",
+          "video": "But what is a Neural Network?",
+          "timestamp_seconds": 649.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Why did modern deep networks move away from the sigmoid activation function toward ReLU, and how is ReLU defined?",
+          "video": "But what is a Neural Network?",
+          "timestamp_seconds": 1024.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": 4,
+          "reciprocal_rank": 0.25,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": true
+        },
+        {
+          "question": "Deep Learning में 'Deep' शब्द किससे आता है?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 364.0,
+          "difficulty": "Easy",
+          "query_type": "factual",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Machine Learning और Deep Learning में data dependency के संदर्भ में क्या अंतर है?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 1327.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Representation Learning (Feature Learning) क्या है और यह Deep Learning को Machine Learning से कैसे अलग बनाता है?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 863.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Deep Learning को 'Black Box' क्यों कहा जाता है और इसकी interpretability की कमी का एक व्यावहारिक उदाहरण क्या है?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 1730.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "2010 के बाद Deep Learning के इतना famous होने के पीछे कौन से पाँच कारण बताए गए हैं?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 2096.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": 4,
+          "reciprocal_rank": 0.25,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": true
+        },
+        {
+          "question": "What does GPT stand for, and what is the core invention underlying the current AI boom according to the 3Blue1Brown Transformers video?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 0.0,
+          "difficulty": "Easy",
+          "query_type": "factual",
+          "first_hit_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit@1": true,
+          "hit@3": true,
+          "hit@5": true
+        },
+        {
+          "question": "How does a transformer convert a text-prediction model into a chatbot?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 354.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "What is the softmax function and how does temperature affect it in text generation?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 1410.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "In GPT-3, how many parameters does the embedding matrix contribute, and what are its dimensions?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 1057.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "What semantic arithmetic example involving Germany, Japan, and sushi is described in the Transformers video, and what does it illustrate?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 957.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit@1": true,
+          "hit@3": true,
+          "hit@5": true
+        },
+        {
+          "question": "During training of a transformer, why is it more efficient to use every vector in the final layer rather than only the last one?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 1301.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        }
+      ]
+    },
+    "golden_dataset": {
+      "overall": {
+        "count": 5,
+        "mrr": 0.25,
+        "hit@1": 0.2,
+        "hit@3": 0.2,
+        "hit@5": 0.4
+      },
+      "by_difficulty": {
+        "Hard": {
+          "count": 3,
+          "mrr": 0.4167,
+          "hit@1": 0.3333,
+          "hit@3": 0.3333,
+          "hit@5": 0.6667
+        },
+        "Medium": {
+          "count": 2,
+          "mrr": 0.0,
+          "hit@1": 0.0,
+          "hit@3": 0.0,
+          "hit@5": 0.0
+        }
+      },
+      "by_query_type": {
+        "medium": {
+          "count": 2,
+          "mrr": 0.0,
+          "hit@1": 0.0,
+          "hit@3": 0.0,
+          "hit@5": 0.0
+        },
+        "multi-hop/synthesis": {
+          "count": 3,
+          "mrr": 0.4167,
+          "hit@1": 0.3333,
+          "hit@3": 0.3333,
+          "hit@5": 0.6667
+        }
+      },
+      "per_question": [
+        {
+          "question": "Reinforcement Learning में agent किस आधार पर सीखता है और उसका लक्ष्य क्या होता है?",
+          "video": "All About ML & Deep Learning",
+          "timestamp_seconds": 490.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "Deep Learning को 'Black Box' क्यों कहा जाता है और इसकी interpretability की कमी का एक व्यावहारिक उदाहरण क्या है?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 1730.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "What semantic arithmetic example involving Germany, Japan, and sushi is described in the Transformers video, and what does it illustrate?",
+          "video": "Transformers, the tech behind LLMs",
+          "timestamp_seconds": 957.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": 1,
+          "reciprocal_rank": 1.0,
+          "hit@1": true,
+          "hit@3": true,
+          "hit@5": true
+        },
+        {
+          "question": "What is the role of the bias in a neural network, according to the 3Blue1Brown video?",
+          "video": "But what is a Neural Network?",
+          "timestamp_seconds": 649.0,
+          "difficulty": "Medium",
+          "query_type": "medium",
+          "first_hit_rank": null,
+          "reciprocal_rank": 0.0,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": false
+        },
+        {
+          "question": "2010 के बाद Deep Learning के इतना famous होने के पीछे कौन से पाँच कारण बताए गए हैं?",
+          "video": "What is Deep Learning?",
+          "timestamp_seconds": 2096.0,
+          "difficulty": "Hard",
+          "query_type": "multi-hop/synthesis",
+          "first_hit_rank": 4,
+          "reciprocal_rank": 0.25,
+          "hit@1": false,
+          "hit@3": false,
+          "hit@5": true
+        }
+      ]
+    }
+  }
+}

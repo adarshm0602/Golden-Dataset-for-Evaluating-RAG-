@@ -66,9 +66,13 @@ data/summaries/*
 data/datasets/*
 !data/datasets/.gitkeep
 
-# Reports (generated at runtime)
+# Reports — ignore generated artifacts; track documentation and benchmark results
 reports/*
 !reports/.gitkeep
+!reports/methodology.md
+!reports/future_work.md
+!reports/benchmark_results.json
+!reports/benchmark_results.md
 
 # Logs and temp files
 *.log
