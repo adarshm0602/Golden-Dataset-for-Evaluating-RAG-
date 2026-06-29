@@ -1,0 +1,5 @@
+{
+  "schema_version": "1.0",
+  "description": "Source video registry for the golden RAG evaluation dataset pipeline.",
+  "videos": []
+}
