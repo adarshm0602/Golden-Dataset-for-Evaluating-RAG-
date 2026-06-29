@@ -2,7 +2,7 @@
 
 A reproducible pipeline for building citation-grounded evaluation datasets to benchmark Retrieval-Augmented Generation (RAG) systems.
 
-This project ingests educational YouTube transcripts, cleans and summarizes them, generates candidate question–answer pairs, and curates a golden dataset with timestamped source citations. The result is a fixed benchmark for measuring retrieval accuracy, answer faithfulness, and end-to-end RAG performance.
+This project ingests educational YouTube transcripts, cleans and summarizes them, generates candidate question–answer pairs, curates a golden dataset with timestamped source citations, and runs a **retrieval benchmark** to measure Hit@K and MRR. The result is a fixed evaluation harness for retrieval accuracy, with end-to-end RAG generation documented as future work.
 
 ---
 
@@ -15,7 +15,8 @@ This repository provides:
 - A **reproducible data pipeline** from YouTube captions to structured QA pairs
 - A **candidate pool** of 20 grounded questions across four ML/DL videos
 - A **golden dataset** of five curated questions selected for retrieval difficulty and diversity
-- **Technical reports** documenting methodology and future RAG integration
+- A **retrieval benchmark harness** (`scripts/run_retrieval_benchmark.py`) with published baseline results
+- **Technical reports** documenting methodology, benchmark interpretation, and future RAG integration
 
 The corpus spans English and Hindi instructional content from 3Blue1Brown, CampusX, and CodeWithHarry, covering neural networks, transformers, and deep learning.
 
@@ -58,7 +59,7 @@ The corpus spans English and Hindi instructional content from 3Blue1Brown, Campu
 ### Prerequisites
 
 - Python 3.10+
-- An [Anthropic API key](https://console.anthropic.com/settings/keys) (required for summarization and question generation)
+- An [Anthropic API key](https://console.anthropic.com/settings/keys) — required only for steps 3–5 (summarization and question generation). Transcript download, cleaning, and the retrieval benchmark do not need it.
 
 ### Setup
 
@@ -248,7 +249,32 @@ Retrieval benchmark run on **123 paragraph chunks** from four cleaned transcript
 | Medium | 9 | 11.1% | 11.1% | 11.1% | 0.111 |
 | Multi-hop/synthesis (Hard) | 6 | 16.7% | 16.7% | 66.7% | 0.283 |
 
-Full per-question breakdown: [`reports/benchmark_results.md`](reports/benchmark_results.md).
+### Understanding the metrics
+
+For each question, the benchmark embeds the query, ranks all transcript paragraphs by cosine similarity, and checks whether the **ground-truth chunk** appears in the top results. A chunk counts as correct when its video title matches the citation **and** the question's timestamp falls within that paragraph's `[start, end]` range.
+
+| Metric | Meaning |
+|--------|---------|
+| **Hit@1** | The correct chunk is the single top-ranked result |
+| **Hit@3** | The correct chunk appears somewhere in the top 3 results |
+| **Hit@5** | The correct chunk appears somewhere in the top 5 results |
+| **MRR** | Mean Reciprocal Rank — rewards higher placement (rank 1 → 1.0, rank 2 → 0.5, rank 3 → 0.33, miss → 0) |
+
+**Hit@3** answers: *"Did we find the right passage in the top 3?"* **Hit@5** asks the same for the top 5. A gap between the two (e.g. 16.7% Hit@3 vs 66.7% Hit@5 on Hard questions) means the right passage is often retrieved, but ranked lower — suggesting that retrieving more context may help harder queries.
+
+### Why scores are modest
+
+These numbers are a **baseline**, not a production-ready retrieval system. The overall Hit@3 of ~15–20% is low in absolute terms, but that is expected and informative for this setup:
+
+- **Small corpus** — 123 paragraph chunks across only 4 videos; similar topics from different sources compete for the same top slots.
+- **Small eval set** — With only 5 Easy and 6 Hard questions, each hit or miss moves percentages sharply (one miss on Easy drops Hit@3 from 40% to 20%).
+- **Mixed Hindi and English** — The corpus spans both languages; a general multilingual embedder may not align query and passage language as well as a domain-tuned model.
+- **Paragraph-level chunking** — Ground-truth timestamps must land inside a paragraph boundary; boundary effects can mark an otherwise relevant chunk as a miss.
+- **Vanilla semantic search only** — No reranking, hybrid BM25 + dense retrieval, query expansion, or metadata filtering (e.g. restrict search to the cited video).
+
+The value of this benchmark is the **closed evaluation loop**: corpus → grounded questions → retrieval → measured accuracy. Low scores highlight where a RAG system would fail and what to try next (finer chunking, a reranker, hybrid search, or a stronger embedding model).
+
+Full per-question breakdown: [`reports/benchmark_results.md`](reports/benchmark_results.md). Metric definitions and interpretation of modest scores are also covered in [`reports/methodology.md`](reports/methodology.md) §9 and [`reports/future_work.md`](reports/future_work.md) §2.1 and §9.
 
 ---
 
@@ -261,6 +287,7 @@ The full pipeline is documented in [`reports/methodology.md`](reports/methodolog
 3. **Summarization** — Claude extracts structured summaries (topics, concepts, definitions, examples) grounded strictly in transcript text.
 4. **Candidate generation** — Claude produces ~20 diverse QA pairs with timestamps, difficulty labels, and retrieval rationale.
 5. **Golden selection** — Claude selects the best five questions based on video coverage, concept diversity, difficulty, specificity, and answer quality.
+6. **Retrieval benchmark** — Paragraph chunks from cleaned transcripts are embedded and scored with Hit@K and MRR against both CSVs (see [`reports/methodology.md`](reports/methodology.md) §9).
 
 Selection criteria prioritize questions that would fail if retrieval returns the wrong video, an adjacent topic, or a generic web passage.
 
@@ -268,13 +295,18 @@ Selection criteria prioritize questions that would fail if retrieval returns the
 
 ## Future Work
 
-[`reports/future_work.md`](reports/future_work.md) describes how to use this dataset in a full RAG system:
+[`reports/future_work.md`](reports/future_work.md) describes the full RAG architecture and what remains beyond the current baseline:
 
-- Chunking cleaned transcripts and creating embeddings
-- Storing vectors in a vector database (Chroma, Pinecone, pgvector, etc.)
-- Building a retriever and LLM answer generator
-- Evaluating with Precision@K, Recall@K, MRR, faithfulness, answer correctness, and hallucination detection
-- Scaling the pipeline to hundreds of videos
+| Area | Status |
+|------|--------|
+| Paragraph chunking + dense retrieval + Hit@K / MRR | **Implemented** — `scripts/run_retrieval_benchmark.py` |
+| Vector database (Chroma, pgvector, etc.) | Future |
+| Reranking / hybrid BM25 + dense search | Future |
+| LLM answer generation with retrieved context | Future |
+| Faithfulness, answer correctness, hallucination metrics | Future |
+| Scaling to hundreds of videos | Future |
+
+See [`reports/future_work.md`](reports/future_work.md) §13 for the prioritized roadmap.
 
 ---
 
@@ -340,10 +372,11 @@ the classic example of handwritten digit recognition...
 
 ## Reproducibility
 
-- Dependencies are pinned in `requirements.txt`
+- Dependencies are listed in `requirements.txt` (includes `sentence-transformers` for the retrieval benchmark)
 - Video sources are versioned in `videos.json`
 - Raw transcripts are never modified; all transformations write to downstream directories
 - LLM prompts and selection criteria are embedded in pipeline scripts and documented in `reports/`
+- Benchmark results are committed in `reports/benchmark_results.json` and `.md`; re-run `python3 scripts/run_retrieval_benchmark.py` after corpus or CSV changes
 
 ---
 
@@ -355,9 +388,10 @@ License to be determined. See repository settings or contact maintainers.
 
 ## Contributing
 
-Contributions are welcome. To add videos, extend the pipeline, or improve golden question selection:
+Contributions are welcome. To add videos, extend the pipeline, or improve retrieval scores:
 
 1. Fork the repository
-2. Add videos to `videos.json` and re-run the pipeline
-3. Document methodology changes in `reports/`
-4. Open a pull request with a clear description of changes
+2. Add videos to `videos.json` and re-run the pipeline (steps 1–5)
+3. Re-run `python3 scripts/run_retrieval_benchmark.py` and update benchmark reports
+4. Document methodology changes in `reports/`
+5. Open a pull request with a clear description of changes

@@ -2,11 +2,11 @@
 
 ## 1. Introduction
 
-This report describes how the golden evaluation dataset produced by this project (`golden_dataset.csv`) can be integrated into a future Retrieval-Augmented Generation (RAG) application. The dataset provides five citation-grounded question–answer pairs spanning four educational videos on machine learning and deep learning. Each pair includes a question, reference answer, source video, timestamp, difficulty level, topic, and retrieval rationale.
+This report describes how the golden evaluation dataset produced by this project (`golden_dataset.csv` and `candidate_questions.csv`) integrates with a Retrieval-Augmented Generation (RAG) application. The dataset provides citation-grounded question–answer pairs spanning four educational videos on machine learning and deep learning. Each pair includes a question, reference answer, source video, timestamp, difficulty level, topic, and retrieval rationale.
 
-A complete RAG system built on this corpus would index the cleaned transcripts in `data/cleaned_transcripts/`, retrieve relevant passages at query time, and generate answers with an LLM. The golden dataset serves as the benchmark against which retrieval quality, answer faithfulness, and end-to-end correctness are measured.
+**What is already implemented:** `scripts/run_retrieval_benchmark.py` provides a baseline retrieval harness. It indexes paragraph chunks from `data/cleaned_transcripts/`, embeds them with `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, and scores Hit@1/3/5 and MRR against both evaluation CSVs. Results are written to `reports/benchmark_results.json` and `reports/benchmark_results.md`. See [`reports/methodology.md`](methodology.md) §9 for the full benchmark methodology.
 
-The sections below walk through the recommended architecture, evaluation methodology, and a roadmap for scaling from four videos to hundreds.
+**What remains:** vector-database deployment, optional reranking, LLM answer generation, and end-to-end metrics (faithfulness, answer correctness, hallucination detection). The sections below cover the full target architecture, evaluation methodology, and a roadmap for scaling from four videos to hundreds.
 
 ---
 
@@ -17,6 +17,8 @@ The sections below walk through the recommended architecture, evaluation methodo
 │                         OFFLINE INDEXING                                │
 │                                                                         │
 │  cleaned_transcripts/  →  Chunking  →  Embeddings  →  Vector DB       │
+│                              ▲                                          │
+│                    (paragraph chunks — baseline implemented)            │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -30,11 +32,28 @@ The sections below walk through the recommended architecture, evaluation methodo
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         EVALUATION                                      │
 │                                                                         │
-│  golden_dataset.csv  →  Retrieval metrics  +  Generation metrics         │
+│  candidate_questions.csv + golden_dataset.csv                           │
+│       →  Retrieval metrics (Hit@K, MRR)  [implemented]                │
+│       →  Generation metrics (faithfulness, correctness)  [future]     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-The golden dataset plugs into the evaluation layer. It does not participate in indexing or inference, but it defines the ground truth against which every pipeline variant is scored.
+The golden and candidate datasets plug into the evaluation layer. They do not participate in indexing or inference, but they define the ground truth against which every pipeline variant is scored.
+
+### 2.1 Current baseline (`run_retrieval_benchmark.py`)
+
+| Component | Current implementation |
+|-----------|------------------------|
+| Chunking | One chunk per cleaned paragraph (123 chunks, 4 videos) |
+| Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` via sentence-transformers |
+| Retrieval | In-memory cosine similarity, top-K ranking |
+| Ground truth | Video title match + timestamp within `[start, end]` |
+| Metrics | Hit@1, Hit@3, Hit@5, MRR; stratified by difficulty and query type |
+| Datasets | `candidate_questions.csv` (20) + `golden_dataset.csv` (5) |
+
+**Baseline scores (candidate set, 20 questions):** Hit@3 = 15.0%, Hit@5 = 30.0%, MRR = 0.185. Factual (Easy) queries: 20% Hit@3. Multi-hop/synthesis (Hard) queries: 16.7% Hit@3 but 66.7% Hit@5 — the correct passage is often retrieved but ranked below position 3.
+
+**Why scores are modest:** small corpus and eval set, mixed Hindi/English without domain tuning, paragraph boundary effects on timestamp matching, and no reranking or hybrid retrieval. These limitations are features for a baseline: they show where a production RAG system would fail and what to improve next.
 
 ---
 
@@ -42,7 +61,7 @@ The golden dataset plugs into the evaluation layer. It does not participate in i
 
 ### 3.1 Starting point
 
-Cleaned transcripts in `data/cleaned_transcripts/` are already segmented into timestamped paragraphs with `start`, `end`, and `text` fields. These paragraphs are a natural first chunking unit because they respect sentence boundaries and speaker pauses (see `reports/methodology.md`).
+Cleaned transcripts in `data/cleaned_transcripts/` are already segmented into timestamped paragraphs with `start`, `end`, and `text` fields. These paragraphs are the **current benchmark chunking unit** (see `scripts/run_retrieval_benchmark.py`) because they respect sentence boundaries and speaker pauses (see `reports/methodology.md` §5).
 
 ### 3.2 Chunking strategies to evaluate
 
@@ -89,11 +108,16 @@ Systematically varying chunk size and overlap while holding the golden dataset f
 
 ### 4.1 Model selection
 
-Each chunk's `text` field is passed through an embedding model to produce a dense vector. Candidate models include:
+Each chunk's `text` field is passed through an embedding model to produce a dense vector.
+
+**Current baseline:** `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` — chosen for multilingual support (Hindi + English corpus) and zero API cost. This is the default in `run_retrieval_benchmark.py` (override with `--model`).
+
+**Models to compare against the baseline:**
 
 | Model family | Strengths | Considerations for this corpus |
 |--------------|-----------|-------------------------------|
-| `text-embedding-3-small/large` (OpenAI) | Strong general performance | Good baseline; may not optimize for Hindi |
+| `paraphrase-multilingual-MiniLM-L12-v2` | Free, local, multilingual | **Current baseline**; modest Hit@3 on this eval set |
+| `text-embedding-3-small/large` (OpenAI) | Strong general performance | API cost; good comparison point |
 | `multilingual-e5-large` | Cross-lingual retrieval | Important for Hindi golden questions |
 | `BGE-M3` | Multilingual, hybrid dense+sparse | Handles mixed English/Hindi corpus well |
 | `voyage-3` | High retrieval accuracy | Commercial API dependency |
@@ -166,19 +190,19 @@ query → embed(query) → vector_search(top_k=K) → [chunk_1, ..., chunk_K] �
 
 ### 6.3 Mapping golden questions to relevant chunks
 
-For evaluation, each golden question needs a **relevance judgment set**: the chunk(s) whose timestamp range contains or overlaps the golden `Timestamp`. This can be automated:
+For evaluation, each question needs a **relevance judgment**: the chunk whose timestamp range contains the cited `Timestamp`. This is implemented in `scripts/run_retrieval_benchmark.py`:
 
 ```python
-def find_relevant_chunks(golden_row, all_chunks):
-    target_seconds = parse_timestamp(golden_row["Timestamp"])
-    return [
-        c for c in all_chunks
-        if c["video_title"] == golden_row["Video"]
-        and c["start_seconds"] <= target_seconds <= c["end_seconds"]
-    ]
+def is_correct_chunk(chunk, row):
+    return (
+        chunk.title == row.video
+        and chunk.start <= row.timestamp_seconds <= chunk.end
+    )
 ```
 
-These chunks become the **ground-truth relevant documents** for computing Precision@K, Recall@K, and MRR.
+The benchmark uses **Hit@K** (was any correct chunk in the top K?) rather than Precision@K, because each question has exactly one ground-truth paragraph. MRR measures how highly that paragraph ranks.
+
+Re-running `python3 scripts/run_retrieval_benchmark.py` after changing chunking, embedding model, or retrieval logic produces an updated `reports/benchmark_results.*` for comparison.
 
 ---
 
@@ -223,16 +247,18 @@ A system can pass retrieval evaluation but fail generation (correct passage, wro
 
 ## 8. Evaluating Retrieval Accuracy
 
-### 8.1 Evaluation loop
+### 8.1 Evaluation loop (implemented)
 
-For each row in `golden_dataset.csv`:
+`scripts/run_retrieval_benchmark.py` implements the retrieval-only loop for both `candidate_questions.csv` and `golden_dataset.csv`:
 
-1. Submit the `Question` to the retriever.
-2. Record the ranked list of retrieved chunk IDs.
-3. Compare against the ground-truth relevant chunk(s) derived from `Video` + `Timestamp`.
-4. Optionally pass retrieved chunks to the LLM and compare the generated answer against the golden `Answer`.
+1. Submit the `Question` to the retriever (embed query, rank all paragraph chunks).
+2. Record the ranked list of chunk indices.
+3. Compare against ground truth: `Video` title match + `Timestamp` within chunk `[start, end]`.
+4. Aggregate Hit@1, Hit@3, Hit@5, and MRR overall and by difficulty / query type.
 
-Results should be logged per question and aggregated across the dataset.
+**Not yet implemented:** passing retrieved chunks to an LLM and comparing generated answers against the golden `Answer` (see §7 and §10).
+
+Results are logged per question in `reports/benchmark_results.json` and summarized in `reports/benchmark_results.md`.
 
 ### 8.2 Ground-truth relevance labels
 
@@ -249,31 +275,24 @@ Results should be logged per question and aggregated across the dataset.
 
 ## 9. Retrieval Metrics
 
-### 9.1 Precision@K
+### 9.1 Hit@K (implemented)
 
-**Definition:** Of the top K retrieved chunks, what fraction are relevant?
+**Hit@K** (also called Hit Rate@K) is the primary metric in `run_retrieval_benchmark.py`.
 
-\[
-\text{Precision@K} = \frac{|\{\text{relevant chunks}\} \cap \{\text{top-K retrieved}\}|}{K}
-\]
+**Definition:** For each question, was **any** ground-truth chunk present in the top K retrieved results? Report the fraction of questions where the answer is yes.
 
-**Example:** For K=5, if the retriever returns 5 chunks and 2 are relevant to the golden timestamp, Precision@5 = 0.4.
+| Metric | K values in baseline | Status |
+|--------|----------------------|--------|
+| **Hit@K** | 1, 3, 5 | **Implemented** |
+| **MRR** | — | **Implemented** (see §9.2) |
+| Precision@K | 1, 3, 5 | Reference (§9.3) |
+| Recall@K | 3, 5, 10 | Reference (§9.4) |
 
-**Interpretation for this dataset:** High precision means the retriever is not flooding the LLM with irrelevant passages from wrong videos or adjacent topics. The Germany/Japan/sushi question is a strong precision test—several similar embedding examples exist in the same video, and retrieving the wrong one yields zero precision for that question.
+**Interpreting Hit@3 vs Hit@5:** Hit@3 asks whether the right passage is in the top 3. Hit@5 extends the window. A large gap (e.g. 16.7% Hit@3 vs 66.7% Hit@5 on Hard questions) means retrieval finds the passage but ranks it too low — increasing K or adding a reranker may help harder queries.
 
-### 9.2 Recall@K
+Report all metrics stratified by `Difficulty` and query type. The baseline already does this; see `reports/benchmark_results.md`.
 
-**Definition:** Of all relevant chunks, what fraction appear in the top K results?
-
-\[
-\text{Recall@K} = \frac{|\{\text{relevant chunks}\} \cap \{\text{top-K retrieved}\}|}{|\{\text{relevant chunks}\}|}
-\]
-
-**Example:** If the golden answer requires 2 chunks (e.g., definition + example for the black box question) and only 1 appears in the top 5, Recall@5 = 0.5.
-
-**Interpretation:** Recall matters for multi-chunk answers. The five-reasons enumeration question may require a single long chunk or multiple adjacent chunks; low recall at small K indicates the retriever is missing part of the answer.
-
-### 9.3 Mean Reciprocal Rank (MRR)
+### 9.2 Mean Reciprocal Rank (MRR) — implemented
 
 **Definition:** The average of the reciprocal rank at which the first relevant chunk appears.
 
@@ -281,20 +300,17 @@ Results should be logged per question and aggregated across the dataset.
 \text{MRR} = \frac{1}{|Q|} \sum_{q \in Q} \frac{1}{\text{rank of first relevant chunk for } q}
 \]
 
-**Example:** If the first relevant chunk for a question appears at rank 3, the reciprocal rank is 1/3 ≈ 0.33. If it appears at rank 1, the reciprocal rank is 1.0.
+**Example:** If the first relevant chunk for a question appears at rank 3, the reciprocal rank is 1/3 ≈ 0.33. If it appears at rank 1, the reciprocal rank is 1.0. If no relevant chunk appears in the retrieved set, the contribution is 0.
 
 **Interpretation:** MRR rewards retrievers that place the correct passage at the top of the ranked list. It is particularly informative for this dataset because LLM context windows are often filled with the top 3–5 chunks—if the correct passage ranks 8th, the generator may never see it.
 
-### 9.4 Recommended reporting
+### 9.3 Precision@K (reference)
 
-| Metric | K values | Why |
-|--------|----------|-----|
-| Precision@K | 1, 3, 5 | Measures noise at typical context sizes |
-| Recall@K | 3, 5, 10 | Measures coverage for multi-chunk answers |
-| MRR | — | Measures how quickly the retriever finds the right passage |
-| Hit Rate@K | 1, 5 | Binary: was any relevant chunk in the top K? |
+When each question has exactly one ground-truth paragraph, Hit@K and Precision@K convey similar information.
 
-Report all metrics stratified by `Difficulty` and `Topic` to identify whether failures concentrate on Hard questions or specific subjects.
+### 9.4 Recall@K (reference)
+
+Recall matters for multi-chunk answers (e.g. definition + example spanning two chunks). The current benchmark uses single-chunk ground truth; multi-chunk relevance is a future extension.
 
 ---
 
@@ -363,7 +379,9 @@ Hallucination is the failure mode where the LLM invents facts, misattributes exa
 
 ## 11. End-to-End Evaluation Workflow
 
-A recommended evaluation script for a future RAG project:
+The **retrieval stage** of this workflow is implemented in `scripts/run_retrieval_benchmark.py`. The **generation stage** remains future work.
+
+A full end-to-end evaluation script would look like:
 
 ```
 For each row in golden_dataset.csv:
@@ -484,19 +502,23 @@ Manual review of five questions does not scale. Options:
 
 ## 13. Recommended Next Steps
 
-| Priority | Action | Expected outcome |
-|----------|--------|------------------|
-| 1 | Chunk `data/cleaned_transcripts/` and build a local vector index | Searchable corpus ready for retrieval |
-| 2 | Implement retrieval evaluation against `golden_dataset.csv` | Baseline Precision@K, Recall@K, MRR |
-| 3 | Add LLM generation with retrieved context | End-to-end RAG prototype |
-| 4 | Score faithfulness, correctness, and hallucination | Full pipeline benchmark |
-| 5 | Experiment with chunk size, embedding model, and K | Identify optimal configuration |
-| 6 | Expand `videos.json` and re-run the pipeline | Scale toward a larger golden set |
+| Priority | Action | Status | Expected outcome |
+|----------|--------|--------|------------------|
+| 1 | Chunk `data/cleaned_transcripts/` and embed with multilingual model | **Done** | Paragraph-level baseline in `run_retrieval_benchmark.py` |
+| 2 | Implement retrieval evaluation against both CSVs | **Done** | Hit@K, MRR in `reports/benchmark_results.*` |
+| 3 | Persist embeddings in a vector database (Chroma, pgvector) | Future | Production-style retrieval API |
+| 4 | Add reranking or hybrid BM25 + dense search | Future | Improve baseline Hit@3 |
+| 5 | Add LLM generation with retrieved context | Future | End-to-end RAG prototype |
+| 6 | Score faithfulness, correctness, and hallucination | Future | Full pipeline benchmark |
+| 7 | Experiment with chunk size, embedding model, and K | Future | Identify optimal configuration |
+| 8 | Expand `videos.json` and re-run the pipeline | Future | Scale toward a larger golden set |
 
 ---
 
 ## 14. Conclusion
 
-The golden dataset is the evaluation anchor for a future RAG system built on this project's transcript corpus. It provides fixed questions, reference answers, and timestamp citations that enable rigorous measurement of retrieval accuracy (Precision@K, Recall@K, MRR) and generation quality (faithfulness, answer correctness, hallucination detection).
+The golden and candidate datasets are the evaluation anchor for RAG systems built on this project's transcript corpus. They provide fixed questions, reference answers, and timestamp citations that enable rigorous measurement of retrieval accuracy (Hit@K, MRR) and, in future work, generation quality (faithfulness, answer correctness, hallucination detection).
 
-The current five-question set is intentionally small and challenging—spanning four videos, two languages, and a range of retrieval failure modes. As the corpus grows to hundreds of videos, the same pipeline architecture applies: chunk, embed, index, retrieve, generate, and evaluate against an expanding golden benchmark. The methodology documented in `reports/methodology.md` and the artifacts in this repository provide a reproducible foundation for that scale-up.
+A **baseline retrieval harness is already in place**: `scripts/run_retrieval_benchmark.py` scores paragraph-level dense retrieval across 123 chunks and 25 evaluation questions, with results in `reports/benchmark_results.md`. The modest baseline scores (15% Hit@3 overall on the candidate set) highlight concrete improvement paths—reranking, hybrid search, alternative embedders, and finer chunking—while keeping the evaluation loop reproducible.
+
+The five-question golden set is intentionally small and challenging—spanning four videos, two languages, and a range of retrieval failure modes. As the corpus grows to hundreds of videos, the same pipeline architecture applies: chunk, embed, index, retrieve, generate, and evaluate against an expanding benchmark. The methodology in `reports/methodology.md` and the artifacts in this repository provide a reproducible foundation for that scale-up.

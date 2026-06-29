@@ -2,9 +2,13 @@
 
 ## 1. Introduction
 
-This report documents the end-to-end methodology used to build a golden evaluation dataset for Retrieval-Augmented Generation (RAG) systems. The dataset is derived from four educational YouTube videos on machine learning and deep learning, processed through a reproducible pipeline of ingestion, cleaning, summarization, candidate generation, and expert selection.
+This report documents the end-to-end methodology used to build a golden evaluation dataset for Retrieval-Augmented Generation (RAG) systems. The dataset is derived from four educational YouTube videos on machine learning and deep learning, processed through a reproducible pipeline of ingestion, cleaning, summarization, candidate generation, expert selection, and retrieval benchmarking.
 
-The final artifact is `golden_dataset.csv`: five curated question–answer pairs, each grounded in a specific transcript passage with a timestamp citation.
+The final artifacts are:
+
+- `candidate_questions.csv` — 20 grounded QA pairs across three difficulty levels
+- `golden_dataset.csv` — five curated question–answer pairs, each tied to a specific transcript passage with a timestamp citation
+- `reports/benchmark_results.json` / `.md` — baseline retrieval metrics (Hit@K, MRR) from `scripts/run_retrieval_benchmark.py`
 
 ---
 
@@ -204,37 +208,88 @@ Each selection was chosen because it stress-tests retrieval in a distinct way:
 
 ---
 
-## 9. Retrieval Failure Modes This Dataset Can Detect
+## 9. Retrieval Benchmark
+
+A baseline retrieval evaluation harness is implemented in `scripts/run_retrieval_benchmark.py`. It closes the loop from corpus to measured retrieval accuracy without requiring a vector database or LLM generation step.
+
+### 9.1 Indexing
+
+1. **Corpus** — Load all JSON files from `data/cleaned_transcripts/`. Each cleaned **paragraph** is one retrieval chunk, with metadata: `video_id`, `title`, `start`, `end`, `text`. The current corpus contains **123 chunks** across four videos.
+2. **Embedding model** — `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (multilingual, suitable for the mixed Hindi/English corpus). Vectors are L2-normalized; similarity is cosine via dot product.
+3. **No external index** — Embeddings are held in memory for this benchmark scale; no Chroma/Pinecone dependency.
+
+### 9.2 Ground-truth matching
+
+For each row in `candidate_questions.csv` (20 rows) and `golden_dataset.csv` (5 rows):
+
+1. Parse `Timestamp` (`HH:MM:SS`) to seconds.
+2. A retrieved chunk is **correct** when:
+   - `chunk.title` exactly matches the row's `Video` field, **and**
+   - `chunk.start <= timestamp_seconds <= chunk.end`
+
+This aligns with how questions were generated: each QA pair cites the paragraph timestamp range where the supporting content appears.
+
+### 9.3 Metrics
+
+| Metric | Definition |
+|--------|------------|
+| **Hit@1** | Correct chunk is the top-ranked result |
+| **Hit@3** | Correct chunk appears in the top 3 results |
+| **Hit@5** | Correct chunk appears in the top 5 results |
+| **MRR** | Mean reciprocal rank of the first correct chunk (rank 1 → 1.0, miss → 0) |
+
+Results are reported **overall**, **by difficulty** (Easy / Medium / Hard), and **by query type** (factual / medium / multi-hop/synthesis). Difficulty maps to query type as: Easy → factual, Hard → multi-hop/synthesis, Medium → medium.
+
+### 9.4 Baseline results (current run)
+
+| Dataset | Questions | Hit@1 | Hit@3 | Hit@5 | MRR |
+|---------|-----------|-------|-------|-------|-----|
+| Candidate questions | 20 | 15.0% | 15.0% | 30.0% | 0.185 |
+| Golden dataset | 5 | 20.0% | 20.0% | 40.0% | 0.250 |
+
+These scores are intentionally modest: small corpus, small eval set, paragraph-level chunking, and vanilla dense retrieval only (no reranking, hybrid search, or metadata filtering). They establish a **reproducible baseline** for comparing future improvements. Full per-question output is in `reports/benchmark_results.json`.
+
+### 9.5 Reproducing
+
+```bash
+python3 scripts/run_retrieval_benchmark.py
+```
+
+Requires `data/cleaned_transcripts/` and the CSV files at the project root. No Anthropic API key is needed for this step.
+
+---
+
+## 10. Retrieval Failure Modes This Dataset Can Detect
 
 The golden dataset is designed to surface specific classes of retrieval failure:
 
-### 9.1 Wrong-video retrieval
+### 10.1 Wrong-video retrieval
 
 Several questions target concepts shared across the corpus (neural networks, deep learning, transformers, ML types). If the retriever returns a passage from the wrong video—e.g., the 3Blue1Brown transformers video when the question is about reinforcement learning in the CodeWithHarry video—the answer will be incorrect or ungrounded.
 
-### 9.2 Near-miss / adjacent-topic retrieval
+### 10.2 Near-miss / adjacent-topic retrieval
 
 Questions such as bias vs. weights, or the Germany/Japan/sushi example vs. other embedding analogies, test whether the retriever can distinguish closely related content within the same video. Returning a topically similar but incorrect passage is a frequent failure in dense embedding search.
 
-### 9.3 Incomplete passage retrieval
+### 10.3 Incomplete passage retrieval
 
 Multi-part questions (five enumerated reasons, black box + example, softmax + temperature) require retrieving a passage that contains the full answer. Chunking strategies that split enumerations or separate definitions from examples will cause partial retrieval and incomplete generation.
 
-### 9.4 Generic vs. source-specific retrieval
+### 10.4 Generic vs. source-specific retrieval
 
 Questions grounded in video-specific phrasing, Hindi terminology, named frameworks (TensorFlow 2015, PyTorch 2016), or unique examples (Jio, social media ban) fail when the retriever returns generic web-level content that is semantically related but not corpus-faithful.
 
-### 9.5 Language and cross-lingual retrieval
+### 10.5 Language and cross-lingual retrieval
 
 Two golden questions are in Hindi and three in English. This tests whether the retrieval index handles multilingual queries and returns passages in the correct language and from the correct source video.
 
-### 9.6 Timestamp / citation misalignment
+### 10.6 Timestamp / citation misalignment
 
 Each golden pair includes a ground-truth timestamp. Evaluation can verify whether retrieved chunks overlap the cited time range, detecting indexing or chunk-alignment errors even when the retrieved text is partially correct.
 
 ---
 
-## 10. Pipeline Summary
+## 11. Pipeline Summary
 
 ```
 videos.json
@@ -253,21 +308,25 @@ scripts/generate_candidate_questions.py  →  candidate_questions.csv (20 pairs)
     │
     ▼
 scripts/select_golden_questions.py       →  golden_dataset.csv (5 pairs)
+    │
+    ▼
+scripts/run_retrieval_benchmark.py       →  reports/benchmark_results.*
 ```
 
-All scripts are deterministic in their I/O paths and configurable via environment variables (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_MAX_TOKENS`). Raw inputs are preserved; each transformation writes to a downstream directory, maintaining full lineage from YouTube caption to golden QA pair.
+All scripts are deterministic in their I/O paths. Steps 3–5 require `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, and `ANTHROPIC_MAX_TOKENS` in `.env`. Steps 1–2 and the retrieval benchmark require only `requirements.txt` dependencies and local transcript files. Raw inputs are preserved; each transformation writes to a downstream directory, maintaining full lineage from YouTube caption to golden QA pair and measured retrieval scores.
 
 ---
 
-## 11. Limitations and Future Work
+## 12. Limitations and Future Work
 
-- **Sample size** — Five golden questions provide a focused evaluation set, not comprehensive coverage of the corpus. Expansion to 20–50 curated pairs would improve statistical confidence.
+- **Sample size** — Five golden questions and 20 candidate questions provide a focused evaluation set, not comprehensive coverage of the corpus. Percentages are noisy at this scale (one hit or miss moves Easy Hit@3 by 20 percentage points).
+- **Baseline retrieval only** — The current harness measures dense semantic search with a single multilingual embedder. End-to-end RAG (LLM generation, faithfulness scoring) and vector-database deployment are documented in `reports/future_work.md`.
 - **LLM-assisted curation** — Both candidate generation and golden selection use Claude. Human review of selected pairs is recommended before production benchmarking.
 - **Caption quality** — Auto-generated captions may contain transcription errors that propagate to QA pairs. Manual spot-checking of cited passages is advised.
 - **Static corpus** — The dataset reflects a fixed snapshot of four videos. Corpus updates require re-running the pipeline and re-validating golden pairs.
 
 ---
 
-## 12. Conclusion
+## 13. Conclusion
 
-This project implements a reproducible pipeline from YouTube transcripts to a citation-grounded golden RAG evaluation dataset. By anchoring each question to a specific video, timestamp, and transcript passage—and by selecting questions that stress-test disambiguation, completeness, and source specificity—the dataset enables systematic measurement of retrieval quality independent of generation quality. The methodology prioritizes traceability, diversity across sources and concepts, and explicit documentation of why each evaluation case matters.
+This project implements a reproducible pipeline from YouTube transcripts to a citation-grounded golden RAG evaluation dataset **with a measured retrieval baseline**. By anchoring each question to a specific video, timestamp, and transcript passage—and by selecting questions that stress-test disambiguation, completeness, and source specificity—the dataset enables systematic measurement of retrieval quality independent of generation quality. The methodology prioritizes traceability, diversity across sources and concepts, explicit documentation of why each evaluation case matters, and reproducible Hit@K / MRR reporting via `scripts/run_retrieval_benchmark.py`.
